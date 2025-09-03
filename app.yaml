@@ -1,0 +1,15 @@
+runtime: nodejs20
+env: standard
+service: cashflow-calc
+
+env_variables:
+  NODE_ENV: production
+
+automatic_scaling:
+  min_instances: 1
+  max_instances: 10
+
+resources:
+  cpu: 1
+  memory_gb: 0.5
+  disk_size_gb: 10
