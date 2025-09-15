@@ -1,6 +1,5 @@
 import moment from 'moment'
-import { formatForInvestmentReport } from './helpers/dateTime.js';
-
+import { formatForInvestmentReport } from './helpers/dateTime.js'
 
 function formatCost(price) {
     if (price === undefined || price === null) return
@@ -47,6 +46,11 @@ function calculateLoanDisbursement(quarters, totalLoanAmount, assetType) {
         2: [0.85, 0.15],
         1: [1.0],
     }
+
+    // const plotDistributions = {
+    //     2: [0.5, 0.5],
+    //     1: [1.0],
+    // };
 
     if (assetType === 'plot') {
         if (numQuarters <= 4) {
@@ -141,7 +145,7 @@ function calculateIRRMonthly(values, initialGuess = 0.05) {
     return '#NUM!'
 }
 
-export function getMinimumArea(property) {
+function getMinimumArea(property) {
     const { assetType, configuration } = property
 
     switch (assetType) {
@@ -159,6 +163,9 @@ export function getMinimumArea(property) {
     }
 }
 
+/**
+ * Gets minimum area from apartment configurations
+ */
 function getMinimumApartmentArea(config) {
     if (!config) return null
     const allConfigs = [
@@ -176,6 +183,7 @@ function getMinimumApartmentArea(config) {
         ...(config.sixBHK ?? []),
     ]
 
+    // Filter available units and get minimum carpet area
     const availableAreas = allConfigs
         .filter((unit) => unit.available)
         .map((unit) => unit.sbua)
@@ -184,6 +192,9 @@ function getMinimumApartmentArea(config) {
     return availableAreas.length > 0 ? Math.min(...availableAreas) : null
 }
 
+/**
+ * Gets minimum area from villa configurations
+ */
 function getMinimumVillaArea(config) {
     if (!config || config.length === 0) return null
 
@@ -200,6 +211,9 @@ function getMinimumVillaArea(config) {
     return areas.length > 0 ? Math.min(...areas) : null
 }
 
+/**
+ * Gets minimum area from plot configurations
+ */
 function getMinimumPlotArea(config) {
     if (!config || config.length === 0) return null
 
@@ -208,7 +222,8 @@ function getMinimumPlotArea(config) {
     return areas.length > 0 ? Math.min(...areas) : null
 }
 
-export function getMinimumAreaWithSbua(property) {
+// Alternative function that also considers the property's sbua field
+function getMinimumAreaWithSbua(property) {
     const configMinArea = getMinimumArea(property)
     const sbuaArea = property.sbua
 
@@ -219,7 +234,13 @@ export function getMinimumAreaWithSbua(property) {
     return configMinArea || sbuaArea || null
 }
 
-export function getPropertyMinimumArea(property) {
+/**
+ * Universal function to get minimum area from any property type
+ * Automatically determines the asset type and calls the appropriate function
+ * @param property - The property object of any asset type
+ * @returns The minimum area in square feet, or null if no area is found
+ */
+function getPropertyMinimumArea(property) {
     switch (property.assetType) {
         case 'apartment':
             return getMinimumApartmentArea(property.configuration)
@@ -235,16 +256,14 @@ export function getPropertyMinimumArea(property) {
             return null
     }
 }
-
-export function calculateGrowth(cagr) {
+function calculateGrowth(cagr) {
     if (cagr === undefined || cagr === null) return null
     if (cagr >= 9) return 'High'
     if (cagr > 4 && cagr < 9) return 'Medium'
     if (cagr <= 4) return 'Low'
     return null
 }
-
-export function calculateEstSellingPrice(localProperty, years = 4) {
+function calculateEstSellingPrice(localProperty, years = 4) {
     const area = getPropertyMinimumArea(localProperty) || 0
     const basePrice =
         localProperty?.projectOverview?.pricePerSqft && area
@@ -255,7 +274,7 @@ export function calculateEstSellingPrice(localProperty, years = 4) {
     return basePrice * Math.pow(1 + localProperty.investmentOverview.cagr / 100, years)
 }
 
-export function calculatePropertyInvestment(data) {
+function calculateReport(data) {
     try {
         const {
             acquisitionPrice,
@@ -272,28 +291,52 @@ export function calculatePropertyInvestment(data) {
                 ? parseInt(inputCompletionDate, 10) || 1798695610
                 : inputCompletionDate || 1798695610
 
+        // current date
         const bookingDate = moment()
+
+        // handover date
         let constructionDate = moment(formatForInvestmentReport(constructionCompletionDate), 'YYYY-MM-DD')
+
+        // we will start disbursing loan amount 3 months after the current date
         const quarterDate = moment(bookingDate).add(3, 'months')
 
+        // if the construction date is before the quarter date then move construction date 1 year forward
         if (constructionDate.isBefore(quarterDate)) {
             constructionDate = quarterDate.clone().add(1, 'year')
         }
 
         const monthlyInterestRate = interestRate / 12 / 100
+
+        // booking amount will be 10 %
         const bookingAmount = 0.1 * acquisitionPrice
+
+        // possession amount will be 5 % or less than 5 %
         const possessionPercent = Math.min(5, 90 - loanPercentage)
         const possessionAmount = (possessionPercent / 100) * acquisitionPrice
+
         const handoverPeriod = constructionDate.year() - bookingDate.year()
+
+        // to check
+        // if the handover period is more than or equal to holding period then transfer fees (2%) otherwise stamp duty and registration charges (6.5%) will be applied
         const transferOrStampRegCharges =
             handoverPeriod >= holdingPeriod
                 ? parseFloat((acquisitionPrice * 0.02).toString())
                 : parseFloat((acquisitionPrice * 0.065).toString())
+
+        // variable for  tracking which charge is applied
         const transferOrStamp = handoverPeriod >= holdingPeriod ? 0 : 1
-        const remainingLoanAmount = (loanPercentage / 100) * acquisitionPrice
+
+        // loan amount
+        const remainingLoanAmount = (loanPercentage / 100) * acquisitionPrice // change
+
+        // if the loan percentage is less than 85 percentrage then (85 - loan percentage) percentage amount will be paid to builder
         const AmountToBuilderPer = Math.max(0, 85 - loanPercentage)
         const AmountToBuilder = (AmountToBuilderPer / 100) * acquisitionPrice
 
+        // cagr
+        // let cagr = Math.pow(finalPrice / acquisitionPrice, 1 / holdingPeriod) - 1;
+
+        //  getting all quarters on which the loan amount will be disursed
         const quarters = []
         while (quarterDate.isBefore(constructionDate)) {
             quarters.push(quarterDate.clone())
@@ -301,29 +344,51 @@ export function calculatePropertyInvestment(data) {
         }
 
         let maxQuartersLength
+
+        // for apartment, etc max holding period is 4 years
         if (assetType === 'apartment') maxQuartersLength = Math.min(16, quarters.length)
         else if (assetType === 'plot') maxQuartersLength = Math.min(8, quarters.length)
         else maxQuartersLength = quarters.length
 
+        // if quarters length is more than  the maxQuarters length then remove some quarters
         while (quarters.length > maxQuartersLength) quarters.pop()
 
+        //  getting all disbursement on all quarters
         const disbursment = calculateLoanDisbursement(quarters, remainingLoanAmount, assetType)
 
         let loanAmount = 0
+
+        // monthy cashflow table
         const table = []
+
+        // yearly cashlows
         let cashflows = []
+
+        // variable for yearly emi sum
         let yearlyEmiSum = 0
+
         const currentDate = moment(bookingDate)
+
+        // montly emis and cashlflow will be calculated for minimum of total tenure and holding period
         const totalMonths = tenure * 12
         const totalHoldingMonths = holdingPeriod * 12
+
         let monthsPassed = 0
+
+        // variable for tracking loan amount disbursed till current date
         let amtDisbursed = 0
+
+        // variable for tracking amount paid to builder yearly
         let yearlyBuilderAmt = 0
+
+        // variable for tracking extra charges for monthly cashflow and yearly cashflow
         let isExtraChargeAndPossessionConsiderForYearly = false
         let isExtraChargeAndPossessionConsiderForMonthly = false
+
         let currentQuarter = 0
 
         for (let i = 0; i < Math.min(totalMonths, totalHoldingMonths); i++) {
+            // change
             const isQuarter = quarters.some((quarter) => quarter.isSame(currentDate, 'month'))
             if (isQuarter) {
                 loanAmount += disbursment[currentQuarter]
@@ -331,19 +396,21 @@ export function calculatePropertyInvestment(data) {
                 currentQuarter++
             }
 
-            let monthlyBuilderAmt = 0
+            let monthlyBuilderAmt = 0 // includes intial amount to builder (85- loan percentage (if less than 85)), possession amount, and loan amount not disbursed at last
+
             const openingLoanAmount = loanAmount
             const interest = loanAmount * monthlyInterestRate
             const emi =
                 (loanAmount * monthlyInterestRate) /
-                (1 - Math.pow(1 + monthlyInterestRate, -(tenure * 12 - monthsPassed)))
+                (1 - Math.pow(1 + monthlyInterestRate, -(tenure * 12 - monthsPassed))) // change
             const principal = emi - interest
             const closingLoanAmount = loanAmount - emi + interest
 
-            let finalMonthlyCashflow = emi ? -emi : 0
-            let monthlyOthersCashFlow = 0
-            const monthlyOthersCashFlowComponents = []
+            let finalMonthlyCashflow = emi ? -emi : 0 // includes all cashflow (inflow and outflow): booking amt, possession amt, extra charges, loan repayment at sale, amt not disbursed till last and amount of sale
+            let monthlyOthersCashFlow = 0 // includes all cashflow except emi: booking amt, possession amt, extra charges, loan repayment at sale, amt not disbursed till last and amount of sale
+            const monthlyOthersCashFlowComponents = [] // includes the components of cashflow
 
+            // on booking date
             if (currentDate.month() === bookingDate.month() && currentDate.year() === bookingDate.year()) {
                 finalMonthlyCashflow -= bookingAmount
                 monthlyOthersCashFlow += bookingAmount
@@ -352,8 +419,10 @@ export function calculatePropertyInvestment(data) {
                 )
                 if (AmountToBuilder) {
                     finalMonthlyCashflow -= AmountToBuilder
+
                     monthlyBuilderAmt += AmountToBuilder
                     yearlyBuilderAmt += AmountToBuilder
+
                     monthlyOthersCashFlow += AmountToBuilder
                     monthlyOthersCashFlowComponents.push(
                         `builder's remaining amount (-${formatCost(parseInt(AmountToBuilder.toString()))})`,
@@ -361,6 +430,7 @@ export function calculatePropertyInvestment(data) {
                 }
             }
 
+            // on handoverMonth possessionAmount and extra charges will be paid
             if (currentDate.month() === constructionDate.month() && currentDate.year() === constructionDate.year()) {
                 finalMonthlyCashflow -= possessionAmount + transferOrStampRegCharges
                 monthlyOthersCashFlow += possessionAmount + transferOrStampRegCharges
@@ -378,10 +448,13 @@ export function calculatePropertyInvestment(data) {
                     )
 
                 isExtraChargeAndPossessionConsiderForMonthly = true
+
+                // only possessionAmount will be paid to builder. extra charges (transferOrStampRegCharges) will be paid to goverment
                 monthlyBuilderAmt += possessionAmount
                 yearlyBuilderAmt += possessionAmount
             }
 
+            // if handover month is after the holding period then possessionAmount and extra charges will be paid on last month
             if (!isExtraChargeAndPossessionConsiderForMonthly && i === Math.min(totalMonths, totalHoldingMonths) - 1) {
                 finalMonthlyCashflow -= possessionAmount + transferOrStampRegCharges
                 monthlyOthersCashFlow += possessionAmount + transferOrStampRegCharges
@@ -399,17 +472,26 @@ export function calculatePropertyInvestment(data) {
                     )
 
                 isExtraChargeAndPossessionConsiderForMonthly = true
+
                 monthlyBuilderAmt += possessionAmount
                 yearlyBuilderAmt += possessionAmount
             }
 
+            // on last month we will balance selling price (price of sale), remaining loan amount to be paid (disbursed) and loan amount that is not disbursed till last
             if (i === Math.min(totalMonths, totalHoldingMonths) - 1) {
+                // selling price
                 finalMonthlyCashflow += finalPrice
+
+                // remaining loan amount to be paid at last
                 finalMonthlyCashflow -= closingLoanAmount
+
+                // loan amount not disbursed till last
                 finalMonthlyCashflow -= parseInt((remainingLoanAmount - amtDisbursed).toString())
+
                 monthlyOthersCashFlow -= finalPrice
                 monthlyOthersCashFlow += closingLoanAmount
                 monthlyOthersCashFlow += parseInt((remainingLoanAmount - amtDisbursed).toString())
+
                 monthlyOthersCashFlowComponents.push(`selling price (+${formatCost(parseInt(finalPrice.toString()))})`)
                 monthlyOthersCashFlowComponents.push(
                     `loan repayment at sale (-${formatCost(parseInt(closingLoanAmount.toString()))})`,
@@ -439,11 +521,14 @@ export function calculatePropertyInvestment(data) {
             loanAmount = closingLoanAmount
             yearlyEmiSum += emi
 
+            // Check if we need to record the yearly EMI sum
             if (currentDate.month() === 11) {
+                // December
                 cashflows.push(-(yearlyEmiSum + yearlyBuilderAmt))
                 yearlyEmiSum = 0
                 yearlyBuilderAmt = 0
 
+                // check if possessionAmount and extra charges are not included in cashflow table
                 if (!isExtraChargeAndPossessionConsiderForYearly && currentDate.year() === constructionDate.year()) {
                     cashflows[cashflows.length - 1] -= transferOrStampRegCharges
                     isExtraChargeAndPossessionConsiderForYearly = true
@@ -473,11 +558,20 @@ export function calculatePropertyInvestment(data) {
 
         cashflows = cashflows.filter((val) => !isNaN(val) && isFinite(val))
 
+        // irr for yearly cashflow
+        // let irr = IRR(cashflows);
+
+        // if(irr===Infinity || irr===0)
+        // irr = irrBisection(cashflows);
+
+        // if (irr === '#NUM') throw new Error("At least one positive and one negative cashflow required");
+
         const monthly_cashflow = table.map((tab) => tab[8])
         const monthly_cashflow_numbers = monthly_cashflow.map((cashflow) =>
             typeof cashflow === 'number' ? cashflow : 0,
         )
 
+        // irr for monthly cashflow table
         let irrForMonthlyCashflow = calculateIRRMonthly(monthly_cashflow_numbers)
 
         if (irrForMonthlyCashflow === Infinity || irrForMonthlyCashflow === 0 || irrForMonthlyCashflow === 'NUM!')
@@ -491,52 +585,46 @@ export function calculatePropertyInvestment(data) {
         }, 0)
         let totalInvestment = bookingAmount + totalIntrest + totalPrinciple
 
+        // only stamp duty and registration charges will be included in total investment
         if (holdingPeriod > handoverPeriod) {
             totalInvestment += transferOrStampRegCharges
         }
 
-        const totalReturns = finalPrice - acquisitionPrice - totalIntrest - transferOrStampRegCharges
+        const totalReturns = finalPrice - acquisitionPrice - totalIntrest - transferOrStampRegCharges //change
 
-        const overview = {
+        return {
+            // irr: parseFloat((irr * 100).toFixed(2)),
             xirr:
                 irrForMonthlyCashflow !== null && typeof irrForMonthlyCashflow === 'number'
                     ? parseFloat(String((irrForMonthlyCashflow * 100).toFixed(2)))
                     : null,
+            cashflows_yearly: cashflows,
+            // booking_amount: bookingAmount,
+            // possession_amount:possessionAmount,
+            // charges_value: transferOrStampRegCharges,
+            // amount_not_disbursed: Math.max(0,remainingLoanAmount - amtDisbursed),
             minInvestment: totalInvestment,
             total_returns: totalReturns,
+            // loan_balance: Math.ceil(loanAmount),
+            // cagr:cagr,
+            // constructionCompletionDate:constructionDate.format("YYYY-MM-DD"),
             equity_multiplier: parseFloat(((totalInvestment + totalReturns) / totalInvestment).toFixed(2)),
-        };
-
-        const monthlyReport = table.map(row => ({
-            month: row[0],
-            openingLoan: row[1],
-            otherCashFlow: row[2],
-            emi: row[3],
-            interest: row[4],
-            principal: row[5],
-            closingLoan: row[6],
-            builderAmount: row[7],
-            finalCashflow: row[8]
-        }));
-
-        const yearlyReport = [];
-        let reportYear = bookingDate.year();
-        // The cashflows array is built year by year, so we can just map it to years.
-        for(const cashflow of cashflows) {
-            yearlyReport.push({
-                year: reportYear,
-                cashflow: cashflow,
-            });
-            reportYear++;
+            monthly_cf: table
         }
-
-
-        return {
-            overview,
-            monthlyReport,
-            yearlyReport,
-        };
     } catch (error) {
         return { error: error.toString() }
     }
+}
+
+export {
+    formatCost,
+    calculateLoanDisbursement,
+    calculateIRRMonthly,
+    getMinimumArea,
+    getMinimumAreaWithSbua,
+    getPropertyMinimumArea,
+    calculateGrowth,
+    calculateEstSellingPrice,
+    calculateReport,
+    calculateReport as calculatePropertyInvestment
 }
