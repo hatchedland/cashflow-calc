@@ -1,15 +1,22 @@
 export function getUnixTimestampFourYearsLater() {
   const currentDate = new Date();
-  const fourYearsLater = new Date(currentDate.getFullYear() + 4, currentDate.getMonth(), currentDate.getDate());
+  const fourYearsLater = new Date(
+    currentDate.getFullYear() + 4,
+    currentDate.getMonth(),
+    currentDate.getDate()
+  );
   return Math.floor(fourYearsLater.getTime() / 1000);
 }
 
 export function getUnixTimestampThreeYearsLater() {
   const currentDate = new Date();
-  const threeYearsLater = new Date(currentDate.getFullYear() + 3, currentDate.getMonth(), currentDate.getDate());
+  const threeYearsLater = new Date(
+    currentDate.getFullYear() + 3,
+    currentDate.getMonth(),
+    currentDate.getDate()
+  );
   return Math.floor(threeYearsLater.getTime() / 1000);
 }
-
 
 export function formatForInvestmentReport(timestamp) {
   // If timestamp is too large, assume it's in milliseconds

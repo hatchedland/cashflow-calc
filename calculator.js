@@ -527,20 +527,20 @@ export function calculatePropertyInvestment(data) {
     return {
       // irr: parseFloat((irr * 100).toFixed(2)),
       xirr: parseFloat((irrForMonthlyCashflow * 100).toFixed(2)),
-      // cashflows_yearly: cashflows,
-      // booking_amount: bookingAmount,
-      // possession_amount:possessionAmount,
-      // charges_value: transferOrStampRegCharges,
-      // amount_not_disbursed: Math.max(0,remainingLoanAmount - amtDisbursed),
+      cashflows_yearly: cashflows,
+      booking_amount: bookingAmount,
+      possession_amount: possessionAmount,
+      charges_value: transferOrStampRegCharges,
+      amount_not_disbursed: Math.max(0, remainingLoanAmount - amtDisbursed),
       total_investment: totalInvestment,
       total_returns: totalReturns,
-      // loan_balance: Math.ceil(loanAmount),
-      // cagr:cagr,
-      // constructionCompletionDate:constructionDate.format("YYYY-MM-DD"),
+      loan_balance: Math.ceil(loanAmount),
+      cagr: cagr,
+      constructionCompletionDate: constructionDate.format("YYYY-MM-DD"),
       equity_multiplier: parseFloat(
         ((totalInvestment + totalReturns) / totalInvestment).toFixed(2)
       ),
-      // monthly_cf: table
+      monthly_cf: table,
     };
   } catch (error) {
     return { error: error.toString() };
